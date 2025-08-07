@@ -1,0 +1,73 @@
+pipeline {
+    agent any
+
+    parameters {
+        booleanParam(
+            name: 'DESTROY_RESOURCES',
+            defaultValue: false,
+            description: 'Check this to destroy the infrastructure after deployment'
+        )
+    }
+
+    environment {
+        GITHUB_CREDS = credentials('git-cred')
+        DOCKERHUB_CREDS = credentials('dhub-cred')
+        AWS_CREDS = credentials('aws-cred')
+        DOCKER_IMAGE = "chandan6/todo_app"
+    }
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                git credentialsId: "${GITHUB_CREDS}", url: 'https://github.com/Chandan-KS16/todo_app.git'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t $DOCKER_IMAGE .'
+            }
+        }
+
+        stage('Login & Push to DockerHub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDS}", passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
+                    sh '''
+                    echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+                    docker push $DOCKER_IMAGE
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to EKS') {
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: "${AWS_CREDS}"]]) {
+                    sh '''
+                    aws eks update-kubeconfig --name todo-cluster --region us-east-1
+                    kubectl apply -f k8s/
+                    '''
+                }
+            }
+        }
+
+        post {
+        success {
+            echo ' Deployment successful!'
+        }
+        failure {
+            echo ' Deployment failed.'
+        }
+        }
+
+        stage('Destroy (Optional)') {
+            when {
+                expression { params.DESTROY_RESOURCES == true }
+            }
+            steps {
+                echo "Destroy flag is ON. Running cleanup..."
+                sh './destroy.sh'
+            }
+        }
+    }
+}

@@ -1,0 +1,18 @@
+{
+  "name": "frontend",
+  "version": "1.0.0",
+  "description": "SSR To-Do List App",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start -H 0.0.0.0"
+  },
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "next": "^14.1.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}
